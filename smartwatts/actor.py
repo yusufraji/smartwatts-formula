@@ -40,6 +40,7 @@ from powerapi.report import HWPCReport, PowerReport
 from .report import FormulaReport
 from .context import SmartWattsFormulaConfig
 from .formula import SmartWattsFormula
+from .carbon import Carbon
 
 
 class SmartwattsValues(FormulaValues):
@@ -69,6 +70,8 @@ class SmartWattsFormulaActor(AbstractCpuDramFormula):
         self.formula = None
         self.formula_pushers = None
         self.real_time_mode = None
+        self.carbon = None
+        self.embodied_emission = None
 
     def _initialization(self, message: FormulaStartMessage):
         AbstractCpuDramFormula._initialization(self, message)
@@ -76,6 +79,8 @@ class SmartWattsFormulaActor(AbstractCpuDramFormula):
         self.formula_pushers = message.values.formula_pushers
         self.ticks = OrderedDict()
         self.formula = SmartWattsFormula(self.config.cpu_topology, self.config.history_window_size)
+        self.carbon = Carbon()
+        self.embodied_emission = 0
 
         self.real_time_mode = self.config.real_time_mode
 
@@ -234,8 +239,22 @@ class SmartWattsFormulaActor(AbstractCpuDramFormula):
             'formula': formula,
             'ratio': ratio,
             'predict': raw_power,
+            'embodied_emission': self.embodied_emission,
         })
-        return PowerReport(timestamp, self.sensor, target, power, metadata)
+        sci = self._gen_sci(power)
+        print("*"*20)
+        print(sci)
+        print("*"*20)
+        return PowerReport(timestamp, self.sensor, target, power, self.carbon.emission, sci, metadata)
+
+    def _gen_sci(self, power):
+        print(power)
+        print(type(power))
+
+        print(self.carbon.emission)
+        print(type(self.carbon.emission))
+        sci = ((power * self.carbon.emission) + self.embodied_emission)
+        return sci
 
     def _gen_rapl_events_group(self, system_report):
         """
